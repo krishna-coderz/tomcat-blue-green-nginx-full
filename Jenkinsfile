@@ -58,7 +58,7 @@ pipeline {
                     sh """
                     echo "Running health check on 192.168.1.20:${env.HEALTH_PORT}"
 
-                    for i in {1..20}; do
+                    for i in {1..100}; do
                         RESPONSE=\$(curl -s http://192.168.1.20:${env.HEALTH_PORT}/health.jsp || true)
                         echo "Response: [\$RESPONSE]"
 
