@@ -23,8 +23,8 @@
     <dependencies>
         <!-- Servlet API (Tomcat provides this, so scope=provided) -->
         <dependency>
-            <groupId>jakarta.servlet</groupId>
-            <artifactId>jakarta.servlet-api</artifactId>
+            <groupId>bluegreen-app</groupId>
+            <artifactId>bluegreen-app</artifactId>
             <version>5.0.0</version>
             <scope>provided</scope>
         </dependency>
