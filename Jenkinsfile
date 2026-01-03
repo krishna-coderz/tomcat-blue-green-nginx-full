@@ -38,13 +38,27 @@ pipeline {
                     if (blueRunning == 0) {
                         // BLUE is active → deploy GREEN
                         sh 'docker rm -f tomcat-green || true'
-                        sh "docker run -d --name tomcat-green --network app-net -p ${GREEN_PORT}:8080 bluegreen-app:latest"
+                        sh """
+                        docker run -d \
+                          --name tomcat-green \
+                          --network app-net \
+                          -p ${GREEN_PORT}:8080 \
+                          -e DEPLOY_ENV=green \
+                          bluegreen-app:latest
+                        """
                         env.NEW_ENV = 'green'
                         env.HEALTH_PORT = GREEN_PORT
                     } else {
                         // GREEN is active → deploy BLUE
                         sh 'docker rm -f tomcat-blue || true'
-                        sh "docker run -d --name tomcat-blue --network app-net -p ${BLUE_PORT}:8080 bluegreen-app:latest"
+                        sh """
+                        docker run -d \
+                          --name tomcat-blue \
+                          --network app-net \
+                          -p ${BLUE_PORT}:8080 \
+                          -e DEPLOY_ENV=blue \
+                          bluegreen-app:latest
+                        """
                         env.NEW_ENV = 'blue'
                         env.HEALTH_PORT = BLUE_PORT
                     }
@@ -94,6 +108,12 @@ pipeline {
                     '''
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Deployment successful. Active environment: ${env.NEW_ENV.toUpperCase()}"
         }
     }
 }
