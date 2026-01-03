@@ -1,64 +1,96 @@
 pipeline {
- agent any
- environment {
-   IMAGE_NAME="bluegreen-app"
- }
- stages {
-  stage('Checkout') {
-   steps {
-    git 'https://github.com/krishna-coderz/tomcat-blue-green-nginx-full.git'
-   }
-  }
-  stage('Build WAR') {
-   steps { sh 'mvn clean package' }
-  }
-  stage('Docker Build') {
-   steps { sh 'docker build -t bluegreen-app:latest .' }
-  }
-  stage('Deploy Inactive') {
-   steps {
-    script {
-     def blue = sh(script:'docker ps | grep tomcat-blue || true', returnStatus:true)
-     if (blue == 0) {
-      sh 'docker rm -f tomcat-green || true'
-      sh 'docker run -d --name tomcat-green --network app-net bluegreen-app:latest'
-      env.NEW_ENV='green'
-     } else {
-      sh 'docker rm -f tomcat-blue || true'
-      sh 'docker run -d --name tomcat-blue --network app-net bluegreen-app:latest'
-      env.NEW_ENV='blue'
-     }
+    agent any
+
+    environment {
+        IMAGE_NAME = "bluegreen-app"
+        BLUE_PORT  = "8081"
+        GREEN_PORT = "8082"
     }
-   }
-  }
-  stage('Health Check') {
-   steps {
-    script {
-     def target = env.NEW_ENV == 'green' ? 'tomcat-green' : 'tomcat-blue'
-     sh '''
-     for i in {1..10}; do
-       if curl -s http://''' + "${target}" + ''' :8080/health.jsp | grep OK; then exit 0; fi
-       sleep 5
-     done
-     exit 1
-     '''
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/krishna-coderz/tomcat-blue-green-nginx-full.git'
+            }
+        }
+
+        stage('Build WAR') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh 'docker build -t bluegreen-app:latest .'
+            }
+        }
+
+        stage('Deploy Inactive') {
+            steps {
+                script {
+                    def blueRunning = sh(
+                        script: "docker ps --format '{{.Names}}' | grep -w tomcat-blue || true",
+                        returnStatus: true
+                    )
+
+                    if (blueRunning == 0) {
+                        // BLUE is running → deploy GREEN
+                        sh 'docker rm -f tomcat-green || true'
+                        sh "docker run -d --name tomcat-green --network app-net -p ${GREEN_PORT}:8080 bluegreen-app:latest"
+                        env.NEW_ENV = 'green'
+                        env.HEALTH_PORT = GREEN_PORT
+                    } else {
+                        // GREEN is running → deploy BLUE
+                        sh 'docker rm -f tomcat-blue || true'
+                        sh "docker run -d --name tomcat-blue --network app-net -p ${BLUE_PORT}:8080 bluegreen-app:latest"
+                        env.NEW_ENV = 'blue'
+                        env.HEALTH_PORT = BLUE_PORT
+                    }
+                }
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                script {
+                    sh """
+                    echo "Running health check on localhost:${env.HEALTH_PORT}"
+                    for i in {1..10}; do
+                        if curl -s http://localhost:${env.HEALTH_PORT}/health.jsp | grep OK; then
+                            echo "Health check PASSED"
+                            exit 0
+                        fi
+                        echo "Waiting for app..."
+                        sleep 5
+                    done
+                    echo "Health check FAILED"
+                    exit 1
+                    """
+                }
+            }
+        }
+
+        stage('Switch Nginx') {
+            steps {
+                script {
+                    if (env.NEW_ENV == 'green') {
+                        sh "sed -i 's/tomcat-blue/tomcat-green/' nginx/default.conf"
+                    } else {
+                        sh "sed -i 's/tomcat-green/tomcat-blue/' nginx/default.conf"
+                    }
+
+                    sh '''
+                    docker rm -f nginx || true
+                    docker run -d --name nginx \
+                      --network app-net \
+                      -p 80:80 \
+                      -v $(pwd)/nginx/default.conf:/etc/nginx/conf.d/default.conf \
+                      nginx
+                    '''
+                }
+            }
+        }
     }
-   }
-  }
-  stage('Switch Nginx') {
-   steps {
-    script {
-     if (env.NEW_ENV == 'green') {
-      sh "sed -i 's/tomcat-blue/tomcat-green/' nginx/default.conf"
-     } else {
-      sh "sed -i 's/tomcat-green/tomcat-blue/' nginx/default.conf"
-     }
-     sh '''
-     docker rm -f nginx || true
-     docker run -d --name nginx --network app-net -p 80:80        -v $(pwd)/nginx/default.conf:/etc/nginx/conf.d/default.conf nginx
-     '''
-    }
-   }
-  }
- }
 }
