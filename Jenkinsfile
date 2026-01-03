@@ -6,7 +6,7 @@ pipeline {
  stages {
   stage('Checkout') {
    steps {
-    git 'https://github.com/YOUR_USERNAME/tomcat-blue-green-nginx.git'
+    git 'https://github.com/krishna-coderz/tomcat-blue-green-nginx.git'
    }
   }
   stage('Build WAR') {
