@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             http://maven.apache.org/maven-v4_0_0.xsd">
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
 
@@ -11,32 +11,30 @@
     <version>1.0.0</version>
     <packaging>war</packaging>
 
-    <!-- Java version enforcement -->
+    <!-- Java version -->
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Build with Java 11 (change if you use 17) -->
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <failOnMissingWebXml>false</failOnMissingWebXml>
     </properties>
 
     <dependencies>
-        <!-- Servlet API (Tomcat provides this, so scope=provided) -->
+        <!-- Servlet API (provided by Tomcat at runtime) -->
         <dependency>
-            <groupId>bluegreen-app</groupId>
-            <artifactId>bluegreen-app</artifactId>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
             <version>5.0.0</version>
             <scope>provided</scope>
         </dependency>
-
-        <!-- Add other dependencies your app needs here -->
     </dependencies>
 
     <build>
-        <finalName>${project.artifactId}</finalName>
+        <!-- FORCE WAR name to match Dockerfile -->
+        <finalName>bluegreen-app</finalName>
 
         <plugins>
-            <!-- Make sure you use a modern WAR plugin -->
+            <!-- WAR plugin (Java 11+ compatible) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-war-plugin</artifactId>
@@ -46,7 +44,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Compiler plugin to match the Java version -->
+            <!-- Compiler plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -56,7 +54,6 @@
                     <target>${maven.compiler.target}</target>
                 </configuration>
             </plugin>
-
         </plugins>
     </build>
 
