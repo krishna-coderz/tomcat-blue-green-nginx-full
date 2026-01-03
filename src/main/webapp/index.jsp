@@ -1,6 +1,8 @@
-<html>
-<body>
-<h1>Blue Green Deployment</h1>
-<h2>Nginx + Jenkins + Docker</h2>
-</body>
-</html>
+<%
+String env = System.getenv("DEPLOY_ENV");
+String color = "green".equals(env) ? "green" : "blue";
+%>
+
+<div style="background:<%=color%>;color:white;padding:10px">
+  <%= env.toUpperCase() %> ENVIRONMENT
+</div>
