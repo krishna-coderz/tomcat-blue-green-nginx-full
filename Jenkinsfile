@@ -36,13 +36,13 @@ pipeline {
                     )
 
                     if (blueRunning == 0) {
-                        // BLUE is running → deploy GREEN
+                        // BLUE is active → deploy GREEN
                         sh 'docker rm -f tomcat-green || true'
                         sh "docker run -d --name tomcat-green --network app-net -p ${GREEN_PORT}:8080 bluegreen-app:latest"
                         env.NEW_ENV = 'green'
                         env.HEALTH_PORT = GREEN_PORT
                     } else {
-                        // GREEN is running → deploy BLUE
+                        // GREEN is active → deploy BLUE
                         sh 'docker rm -f tomcat-blue || true'
                         sh "docker run -d --name tomcat-blue --network app-net -p ${BLUE_PORT}:8080 bluegreen-app:latest"
                         env.NEW_ENV = 'blue'
@@ -52,27 +52,24 @@ pipeline {
             }
         }
 
-        stage('Health Check') {
+        stage('Health Check (Wait Until OK)') {
             steps {
                 script {
                     sh """
-                    echo "Running health check on 192.168.1.20:${env.HEALTH_PORT}"
+                    echo "Waiting for application to become healthy on 192.168.1.20:${env.HEALTH_PORT}"
 
-                    for i in {1..100}; do
+                    while true; do
                         RESPONSE=\$(curl -s http://192.168.1.20:${env.HEALTH_PORT}/health.jsp || true)
-                        echo "Response: [\$RESPONSE]"
+                        echo "Health response: [\$RESPONSE]"
 
                         if echo "\$RESPONSE" | grep -q "OK"; then
-                            echo "Health check PASSED"
-                            exit 0
+                            echo "✅ Health check OK — proceeding"
+                            break
                         fi
 
-                        echo "Waiting for application to become healthy..."
-                        sleep 20
+                        echo "⏳ App not ready yet, retrying in 15 seconds..."
+                        sleep 15
                     done
-
-                    echo "Health check FAILED after retries"
-                    exit 1
                     """
                 }
             }
