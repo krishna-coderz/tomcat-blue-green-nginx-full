@@ -58,7 +58,7 @@ pipeline {
                     sh """
                     echo "Running health check on localhost:${env.HEALTH_PORT}"
                     for i in {1..10}; do
-                        if curl -s http://localhost:${env.HEALTH_PORT}/health.jsp | grep OK; then
+                        if curl -s http://192.168.1.20:${env.HEALTH_PORT}/health.jsp | grep OK; then
                             echo "Health check PASSED"
                             exit 0
                         fi
