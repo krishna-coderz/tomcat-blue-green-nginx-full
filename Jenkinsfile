@@ -56,16 +56,22 @@ pipeline {
             steps {
                 script {
                     sh """
-                    echo "Running health check on localhost:${env.HEALTH_PORT}"
-                    for i in {1..10}; do
-                        if curl -s http://192.168.1.20:${env.HEALTH_PORT}/health.jsp | grep OK; then
+                    echo "Running health check on 192.168.1.20:${env.HEALTH_PORT}"
+
+                    for i in {1..20}; do
+                        RESPONSE=\$(curl -s http://192.168.1.20:${env.HEALTH_PORT}/health.jsp || true)
+                        echo "Response: [\$RESPONSE]"
+
+                        if echo "\$RESPONSE" | grep -q "OK"; then
                             echo "Health check PASSED"
                             exit 0
                         fi
-                        echo "Waiting for app..."
+
+                        echo "Waiting for application to become healthy..."
                         sleep 20
                     done
-                    echo "Health check FAILED"
+
+                    echo "Health check FAILED after retries"
                     exit 1
                     """
                 }
