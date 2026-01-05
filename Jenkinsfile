@@ -1,6 +1,14 @@
 pipeline {
     agent any
 
+    parameters {
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['blue', 'green'],
+            description: 'Select environment to deploy latest app'
+        )
+    }
+
     environment {
         IMAGE_NAME = "bluegreen-app"
         BLUE_PORT  = "8081"
@@ -16,16 +24,14 @@ pipeline {
             }
         }
 
-        stage('Detect Active Environment') {
+        stage('Prepare Environment') {
             steps {
                 script {
-                    env.ACTIVE_ENV = readFile(STATE_FILE).trim()
-                    env.NEW_ENV = (env.ACTIVE_ENV == "blue") ? "green" : "blue"
+                    env.DEPLOY_ENV = params.TARGET_ENV
+                    env.DEPLOY_PORT = (env.DEPLOY_ENV == 'blue') ? BLUE_PORT : GREEN_PORT
+                    env.OLD_ENV = (env.DEPLOY_ENV == 'blue') ? 'green' : 'blue'
 
-                    env.NEW_PORT = (env.NEW_ENV == "blue") ? BLUE_PORT : GREEN_PORT
-
-                    echo "Active: ${env.ACTIVE_ENV}"
-                    echo "Deploying to: ${env.NEW_ENV}"
+                    echo "Deploying to: ${env.DEPLOY_ENV}"
                 }
             }
         }
@@ -42,17 +48,17 @@ pipeline {
             }
         }
 
-        stage('Deploy to Standby') {
+        stage('Deploy Selected Environment') {
             steps {
                 script {
-                    sh "docker rm -f tomcat-${env.NEW_ENV} || true"
+                    sh "docker rm -f tomcat-${env.DEPLOY_ENV} || true"
 
                     sh """
                     docker run -d \
-                      --name tomcat-${env.NEW_ENV} \
+                      --name tomcat-${env.DEPLOY_ENV} \
                       --network app-net \
-                      -p ${env.NEW_PORT}:8080 \
-                      -e DEPLOY_ENV=${env.NEW_ENV} \
+                      -p ${env.DEPLOY_PORT}:8080 \
+                      -e DEPLOY_ENV=${env.DEPLOY_ENV} \
                       ${IMAGE_NAME}:latest
                     """
                 }
@@ -62,10 +68,8 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh """
-                echo "Checking health on ${env.NEW_ENV}..."
-
-                until curl -s http://192.168.1.20:${env.NEW_PORT}/health.jsp | grep OK; do
-                    echo "Waiting for app..."
+                until curl -s http://192.168.1.20:${env.DEPLOY_PORT}/health.jsp | grep OK; do
+                    echo "Waiting for ${env.DEPLOY_ENV}..."
                     sleep 10
                 done
                 """
@@ -74,32 +78,30 @@ pipeline {
 
         stage('Switch Nginx') {
             steps {
-                script {
-                    sh """
-                    sed -i 's/tomcat-${env.ACTIVE_ENV}/tomcat-${env.NEW_ENV}/' nginx/default.conf
-                    docker rm -f nginx || true
+                sh """
+                sed -i 's/tomcat-${env.OLD_ENV}/tomcat-${env.DEPLOY_ENV}/' nginx/default.conf
 
-                    docker run -d --name nginx \
-                      --network app-net \
-                      -p 80:80 \
-                      -v \$(pwd)/nginx/default.conf:/etc/nginx/conf.d/default.conf \
-                      nginx
-                    """
-                }
+                docker rm -f nginx || true
+                docker run -d --name nginx \
+                  --network app-net \
+                  -p 80:80 \
+                  -v \$(pwd)/nginx/default.conf:/etc/nginx/conf.d/default.conf \
+                  nginx
+                """
             }
         }
 
         stage('Update Active State') {
             steps {
-                writeFile file: STATE_FILE, text: env.NEW_ENV
-                echo "Now active: ${env.NEW_ENV}"
+                writeFile file: STATE_FILE, text: env.DEPLOY_ENV
+                echo "Active environment is now ${env.DEPLOY_ENV}"
             }
         }
     }
 
     post {
         success {
-            echo "✅ ZERO-DOWNTIME DEPLOYMENT COMPLETE"
+            echo "✅ Deployment completed to ${params.TARGET_ENV.toUpperCase()}"
         }
     }
 }
