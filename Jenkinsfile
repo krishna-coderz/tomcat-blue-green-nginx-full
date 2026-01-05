@@ -42,12 +42,12 @@ pipeline {
                         docker run -d \
                           --name tomcat-green \
                           --network app-net \
-                          -p ${BLUE_PORT}:8080 \
+                          -p ${GREEN_PORT}:8080 \
                           -e DEPLOY_ENV=green \
                           bluegreen-app:latest
                         """
                         env.NEW_ENV = 'green'
-                        env.HEALTH_PORT = BLUE_PORT
+                        env.HEALTH_PORT = GREEN_PORT
                     } else {
                         // GREEN is active → deploy BLUE
                         sh 'docker rm -f tomcat-blue || true'
@@ -55,7 +55,7 @@ pipeline {
                         docker run -d \
                           --name tomcat-blue \
                           --network app-net \
-                          -p ${GREEN_PORT}:8080 \
+                          -p ${BLUE_PORT}:8080 \
                           -e DEPLOY_ENV=blue \
                           bluegreen-app:latest
                         """
